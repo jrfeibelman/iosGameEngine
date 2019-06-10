@@ -10,15 +10,14 @@ import SpriteKit
 
 class GameScene: SKScene, SKPhysicsContactDelegate {
     
-    private let player = Player()
+    private var player : Player?
     
     private var terrain = Terrain()
     private let terrainSize : UInt8 = 7
     
-    private var isAlive = false
+    private let plotsOnScreen = 4
     
-//    var scoreLabel = SKLabelNode()
-//    var score = Int(0)
+    private var isAlive = false
     
     private var pausePanel = SKSpriteNode()
     
@@ -29,20 +28,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let walkArrow = SKSpriteNode(imageNamed: "arrow")
     private let sprintArrow = SKSpriteNode(imageNamed: "arrow")
     
-    private let movementGUIScale : CGFloat = 4;
+    private let movementGUIScale : CGFloat = 3;
     private let defaultAnchorPoint = CGPoint(x: 0.5, y: 0.5)
     
     override func didMove(to view: SKView) {
         
         physicsWorld.contactDelegate = self
+        self.scaleMode = .resizeFill
         
         cursor.setScale(movementGUIScale)
         walkArrow.setScale(movementGUIScale)
         sprintArrow.setScale(movementGUIScale)
         
-        cursor.anchorPoint = defaultAnchorPoint
-        walkArrow.anchorPoint = defaultAnchorPoint
-        sprintArrow.anchorPoint = defaultAnchorPoint
+        cursor.anchorPoint = CGPoint(x: 0, y: 0)
+        walkArrow.anchorPoint = CGPoint(x: 0, y: 0)
+        sprintArrow.anchorPoint = CGPoint(x: 0, y: 0)
         
         cursor.zPosition = 10
         walkArrow.zPosition = 10
@@ -54,8 +54,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         createPlayer()
         createBG()
-//        createGrounds()
-        //        getLabel()
     }
     
     func didBegin(_ contact: SKPhysicsContact) {
@@ -69,19 +67,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             firstBody = contact.bodyB
             secondBody = contact.bodyA
         }
-    
+        
         if firstBody.node?.name == "Player" && secondBody.node?.name == "Plot" {
             let plot = secondBody.node as! Plot
-            print(plot.getID())
-            
-            if plot.getID() == WorldPosition.rightEnd.rawValue {
-                player.worldPos = WorldPosition.rightEnd
-            } else if plot.getID() == WorldPosition.leftEnd.rawValue {
-                player.worldPos = WorldPosition.leftEnd
+            player!.plotPos = plot.getID()
+        }
+    
+        if firstBody.node?.name == "Player" && secondBody.node?.name == "PlotEnd" {
+            if player!.rightDir {
+                player!.worldPos = WorldPosition.rightEnd
             } else {
-                player.worldPos = WorldPosition.inWorld
+                player!.worldPos = WorldPosition.leftEnd
             }
-            
         }
     }
     
@@ -97,41 +94,35 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             secondBody = contact.bodyA
         }
 
-        if firstBody.node?.name == "Player" && secondBody.node?.name == "Plot" {
-//            let plot = secondBody.node as! Plot
-
-            if player.worldPos != WorldPosition.inWorld {
-                player.worldPos = WorldPosition.inWorld
+        if firstBody.node?.name == "Player" && secondBody.node?.name == "PlotEnd" {
+            if player!.worldPos != WorldPosition.inWorld {
+                player!.worldPos = WorldPosition.inWorld
             }
-            
         }
     }
 
-    
     private func createPlayer() {
-        player.position = CGPoint(x: -10, y: 20)
-        self.addChild(player)
+        player = Player(plotPos: Int(self.terrain.mapSize/2))
+        player!.position = CGPoint(x: 0, y: 0)
+        self.addChild(player!)
     }
     
     private func createBG() {
         for i in 0...2 {
             let bg = SKSpriteNode(imageNamed: "BG")
             bg.name = "BG"
-            bg.anchorPoint = defaultAnchorPoint
+            bg.anchorPoint = CGPoint(x: 0.5, y: 0.5)
             bg.position = CGPoint(x: CGFloat(i) * bg.size.width, y: 0)
-            bg.zPosition = 0
+            bg.zPosition = -100
             self.addChild(bg)
         }
     }
     
     override func update(_ currentTime: TimeInterval) {
         
-        if player.getMovement() != MovementType.still {
-            moveBackgroundsAndGrounds(sprinting: player.getMovement() == MovementType.sprint, right: player.isMovingRight())
+        if player!.getMovement() != MovementType.still {
+            moveBackgroundsAndGrounds(sprinting: player!.getMovement() == MovementType.sprint, right: player!.isMovingRight())
         }
-        
-//        checkPlayersBounds()
-        
     }
     
     private func moveBackgroundsAndGrounds(sprinting : Bool, right : Bool) {
@@ -140,22 +131,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         var backSpeed : CGFloat = 1.5
         
         if sprinting {
-            foreSpeed /= player.getSprintRatio()
-            backSpeed /= player.getSprintRatio()
+            foreSpeed /= player!.getSprintRatio()
+            backSpeed /= player!.getSprintRatio()
         }
         
         if !right {
             
-            if player.worldPos == WorldPosition.leftEnd {
+            if player!.worldPos == WorldPosition.leftEnd {
                 foreSpeed = 0
                 backSpeed = 0
             }
             
             foreSpeed *= -1
             backSpeed *= -1
+            
         } else {
             
-            if player.worldPos == WorldPosition.rightEnd {
+            if player!.worldPos == WorldPosition.rightEnd {
                 foreSpeed = 0
                 backSpeed = 0
             }
@@ -173,72 +165,44 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             } else if bgNode.position.x > (self.frame.width) {
                 bgNode.position.x -= bgNode.size.width * 3
             }
-            
         }))
         
-        
-        
-        
-        
-        
+        enumerateChildNodes(withName: "PlotEnd", using: ({
+            (node, error) in
+            self.movePlot(plot: node as! Plot, speed: foreSpeed)
+        }))
         
         enumerateChildNodes(withName: "Plot", using: ({
             (node, error) in
-            
-            let plot = node as! Plot
-            
-            plot.position.x -= foreSpeed
-            
-            if plot.position.x < -(self.frame.width - 7*plot.size.width/8) { // going right
-                
-                plot.removeFromParent()
-                
-                print("right-remove: " + String(plot.getID()))
-                
-                if plot.getID() + 4 <= self.terrainSize - 1 {
-                    self.terrain.showPlot(id: plot.getID() + 4, right: true)
-                    
-                    
-                } else {
-//                    if !self.showingWorldEnd {
-//                        self.showingWorldEnd = true
-//                        let worldEnd = Plot(terrainType: TerrainType.worldEnd, buildingType: BuildingType.empty, doublePlot: false, id: Int(WorldPosition.rightEnd.rawValue))
-//                        worldEnd.setScale(4)
-//                        worldEnd.xScale = 0.1
-//                        worldEnd.position = CGPoint(x: 5.5 * worldEnd.size.width, y: -self.frame.size.height/2)
-//                        self.addChild(worldEnd)
-//                    }
-                    
-                }
-                
-            } else if plot.position.x > (self.frame.width - 7*plot.size.width/8) { // going left
-                
-                plot.removeFromParent()
-                
-                print("left-remove:s" + String(plot.getID()))
-                
-                if plot.getID() - 4 >= 0 {
-                    self.terrain.showPlot(id: plot.getID() - 4, right: false)
-                } else {
-
-//                    if !self.showingWorldEnd {
-//                        self.showingWorldEnd = true
-//                        let worldEnd = Plot(terrainType: TerrainType.worldEnd, buildingType: BuildingType.empty, doublePlot: false, id: Int(WorldPosition.leftEnd.rawValue))
-//                        worldEnd.setScale(4)
-//                        worldEnd.xScale = 0.1
-//                        worldEnd.position = CGPoint(x: 5.5 * worldEnd.size.width, y: -self.frame.size.height/2)
-//                        self.addChild(worldEnd)
-//                    }
-                }
-            }
-            
+            self.movePlot(plot: node as! Plot, speed: foreSpeed)
         }))
-
     }
     
-    
-    
-    
+    func movePlot(plot : Plot, speed : CGFloat) {
+        
+        plot.position.x -= speed
+        
+        if self.player!.rightDir && plot.position.x < -1 * self.frame.width/2 - plot.size.width { // going right
+            
+            plot.removeFromParent()
+            
+            print("left-remove: " + String(plot.getID()))
+            
+            if plot.getID() + self.plotsOnScreen <= self.terrain.mapSize - 1 {
+                self.terrain.showPlot(id: plot.getID() + self.plotsOnScreen, right: true)
+            }
+            
+        } else if !self.player!.rightDir && plot.position.x > self.frame.width/2 { // going left
+            
+            plot.removeFromParent()
+            
+            print("right-remove: " + String(plot.getID()))
+            
+            if plot.getID() - self.plotsOnScreen >= 0 {
+                self.terrain.showPlot(id: plot.getID() - self.plotsOnScreen, right: false)
+            }
+        }
+    }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         
@@ -292,46 +256,43 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         
+//        print(cursor.position)
+        
         if !gamePaused {
             let loc = touches.first!.location(in: self)
             
-            if loc.x > cursor.position.x + 90 {
+            if loc.x > cursor.position.x + 90 { // Sprint Right
                 walkArrow.isHidden = false
                 sprintArrow.isHidden = false
                 sprintArrow.xScale = movementGUIScale
                 walkArrow.xScale = movementGUIScale
-                sprintArrow.position = CGPoint(x: cursor.position.x + 150, y: cursor.position.y)
-                walkArrow.position = CGPoint(x: cursor.position.x + 75, y: cursor.position.y)
-    //            print("SPRINT RIGHT")
-                player.move(sprinting: true, right: true)
-            } else if loc.x > cursor.position.x + 20 {
+                sprintArrow.position = CGPoint(x: cursor.position.x + 120, y: cursor.position.y + cursor.size.width/2  - walkArrow.size.height/2)
+                walkArrow.position = CGPoint(x: cursor.position.x + 60, y: cursor.position.y + cursor.size.width/2 - walkArrow.size.height/2)
+                player!.move(sprinting: true, right: true)
+            } else if loc.x > cursor.position.x + 20 { // Right
                 sprintArrow.isHidden = true
                 walkArrow.isHidden = false
                 walkArrow.xScale = movementGUIScale
-                walkArrow.position = CGPoint(x: cursor.position.x + 75, y: cursor.position.y)
-    //            print("RIGHT")
-                player.move(sprinting: false, right: true)
-            } else if loc.x < cursor.position.x - 90 {
+                walkArrow.position = CGPoint(x: cursor.position.x + 60, y: cursor.position.y + cursor.size.width/2 - walkArrow.size.height/2)
+                player!.move(sprinting: false, right: true)
+            } else if loc.x < cursor.position.x - 90 { // Sprint Left
                 walkArrow.isHidden = false
                 sprintArrow.isHidden = false
                 sprintArrow.xScale = movementGUIScale *  -1
                 walkArrow.xScale = movementGUIScale * -1
-                sprintArrow.position = CGPoint(x: cursor.position.x - 150, y: cursor.position.y)
-                walkArrow.position = CGPoint(x: cursor.position.x - 75, y: cursor.position.y)
-    //            print("SPRINT LEFT")
-                player.move(sprinting: true, right: false)
-            } else if loc.x < cursor.position.x - 20 {
+                sprintArrow.position = CGPoint(x: cursor.position.x - 120, y: cursor.position.y + cursor.size.width/2  - walkArrow.size.height/2)
+                walkArrow.position = CGPoint(x: cursor.position.x - 60, y: cursor.position.y + cursor.size.width/2  - walkArrow.size.height/2)
+                player!.move(sprinting: true, right: false)
+            } else if loc.x < cursor.position.x - 20 { // Left
                 sprintArrow.isHidden = true
                 walkArrow.isHidden = false
                 walkArrow.xScale = movementGUIScale * -1
-                walkArrow.position = CGPoint(x: cursor.position.x - 75, y: cursor.position.y)
-    //            print("LEFT")
-                player.move(sprinting: false, right: false)
-            } else {
+                walkArrow.position = CGPoint(x: cursor.position.x - 60, y: cursor.position.y + cursor.size.width/2  - walkArrow.size.height/2)
+                player!.move(sprinting: false, right: false)
+            } else { // Not Moving
                 walkArrow.isHidden = true
                 sprintArrow.isHidden = true
-    //            print("NEUTRAL")
-                player.stopMoving()
+                player!.stopMoving()
             }
         }
     }
@@ -341,17 +302,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             cursor.removeFromParent()
             walkArrow.removeFromParent()
             sprintArrow.removeFromParent()
-            player.stopMoving()
+            player!.stopMoving()
         }
     }
     
     
-    private func randomBetweenNumbers(_ firstNumber: CGFloat, secondNumber: CGFloat) -> CGFloat {
-        
-        // arc4random returns a number between 0 to (2**32)-1
-        return CGFloat(arc4random()) / CGFloat(UINT32_MAX) * abs(firstNumber - secondNumber) + min(firstNumber, secondNumber);
-        
-    }
+//    private func randomBetweenNumbers(_ firstNumber: CGFloat, secondNumber: CGFloat) -> CGFloat {
+//
+//        // arc4random returns a number between 0 to (2**32)-1
+//        return CGFloat(arc4random()) / CGFloat(UINT32_MAX) * abs(firstNumber - secondNumber) + min(firstNumber, secondNumber);
+//
+//    }
     
     private func createPausePanel() {
         
@@ -387,43 +348,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         self.addChild(pausePanel)
         
     }
-    
-//    func playerDied() {
-//
-//        let highscore = UserDefaults.standard.integer(forKey: "Highscore");
-//
-//        if highscore < score {
-//            UserDefaults.standard.set(score, forKey: "Highscore");
-//        }
-//
-//        player.removeFromParent();
-//
-//        isAlive = false;
-//
-//        let restart = SKSpriteNode(imageNamed: "Restart");
-//        let quit = SKSpriteNode(imageNamed: "Quit");
-//
-//        restart.name = "Restart";
-//        restart.anchorPoint = defaultAnchorPoint
-//        restart.position = CGPoint(x: -200, y: -150);
-//        restart.zPosition = 10;
-//        restart.setScale(0);
-//
-//        quit.name = "Quit";
-//        quit.anchorPoint = defaultAnchorPoint
-//        quit.position = CGPoint(x: 200, y: -150);
-//        quit.zPosition = 10;
-//        quit.setScale(0);
-//
-//        let scaleUp = SKAction.scale(to: 1, duration: TimeInterval(0.5));
-//
-//        restart.run(scaleUp);
-//        quit.run(scaleUp);
-//
-//        self.addChild(restart);
-//        self.addChild(quit);
-//
-//    }
     
     private func unPauseGame() {
         gamePaused = false;

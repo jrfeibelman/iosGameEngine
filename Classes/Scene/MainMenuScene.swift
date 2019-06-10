@@ -18,6 +18,8 @@ class MainMenuScene: SKScene {
     var scoreLabel = SKLabelNode()
     
     override func didMove(to view: SKView) {
+        self.scaleMode = .aspectFit
+        
         initialize()
     }
     
@@ -64,12 +66,12 @@ class MainMenuScene: SKScene {
     }
     
     func createGrounds() {
-        for i in -1...2 {
+        for i in -2...2 {
             let bg = SKSpriteNode(imageNamed: "terrain")
             bg.name = "Ground"
             bg.setScale(2.4)
-            bg.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            bg.position = CGPoint(x: CGFloat(i) * bg.size.width, y: -(self.frame.size.height / 2) + bg.size.height/2)
+            bg.anchorPoint = CGPoint(x: 0, y: 0)
+            bg.position = CGPoint(x: CGFloat(i) * bg.size.width, y: -(self.frame.size.height / 2))
             bg.zPosition = 3
             self.addChild(bg)
         }
@@ -97,8 +99,8 @@ class MainMenuScene: SKScene {
             
             bgNode.position.x -= 3
             
-            if bgNode.position.x < -(self.frame.width - 7*bgNode.size.width/8) {
-                bgNode.position.x += bgNode.size.width * 4
+            if bgNode.position.x < -(self.frame.width) {
+                bgNode.position.x += bgNode.size.width * 5
             }
             
         }))

@@ -6,29 +6,29 @@
 //  Copyright © 2019 FiBEL. All rights reserved.
 //
 
-import Foundation
+import SpriteKit
 
 class Terrain {
     
     private var terrain : [Plot?]
-    private var mapSize : Int
+    public var mapSize : Int
     private var scene : GameScene?
     
     init() {
         terrain = []
-        mapSize = 5
+        mapSize = 9
     }
 
     init(size : Int, scene : GameScene) {
         
-        self.mapSize = size
+        self.mapSize = size + 4 // Add 4 for world end tiles
         
         if mapSize % 2 == 0 {
             self.mapSize = size - 1
         }
         
-        if mapSize < 5 {
-            fatalError("MapSize cannot be less than 5!")
+        if mapSize < 9 {
+            fatalError("MapSize cannot be less than 9!")
         }
         
         self.scene = scene
@@ -36,7 +36,11 @@ class Terrain {
         terrain = Array<Plot?>(repeating: nil, count: mapSize)
         
         for i in 0...mapSize-1 {
-            self.terrain[i] = Plot(terrainType: TerrainType.grass, buildingType: BuildingType.empty, doublePlot: false, id: i)
+            if i <= 1 || i >= mapSize - 2 {
+                self.terrain[i] = Plot(terrainType: TerrainType.worldEnd, buildingType: BuildingType.empty, doublePlot: false, id: i)
+            } else {
+                self.terrain[i] = Plot(terrainType: TerrainType.grass, buildingType: BuildingType.empty, doublePlot: false, id: i)
+            }
         }
         
         if let spawnPoint = terrain[mapSize/2] {
@@ -47,7 +51,7 @@ class Terrain {
     }
     
     func createTerrain() {
-        for i in -1...2 {
+        for i in -2...1 {
             if let plot = terrain[mapSize/2 + i] {
                 self.scene!.addChild(plot)
                 plot.initSprite(pos: i)
@@ -66,19 +70,14 @@ class Terrain {
             print("right-add: " + String(id))
             let prevPlot = terrain[id-1]!
             plot.position.y = prevPlot.position.y
-            plot.position.x = prevPlot.position.x + plot.size.width
+            plot.position.x = prevPlot.position.x + plot.size.width - 10
         } else {
             print("left-add: " + String(id))
             let prevPlot = terrain[id+1]!
             plot.position.y = prevPlot.position.y
-            plot.position.x = prevPlot.position.x - plot.size.width
-
+            plot.position.x = prevPlot.position.x - plot.size.width + 10
         }
     }
-    
-//    func removePlot(id : Int) {
-//        self.terrain[id]?.removeFromParent()
-//    }
     
     func printTerrainToConsole() {
         print(self.terrain)

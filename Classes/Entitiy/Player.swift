@@ -35,15 +35,20 @@ class Player: SKSpriteNode {
     private let sprintAnimation : SKAction
     
     private var movement = MovementType.still
+    
     public var worldPos = WorldPosition.inWorld
     
-    private var rightDir = true
+    // Approximation of the plot the player is on
+    public var plotPos : Int
+    
+    public var rightDir = true
     
     private var coins : UInt8 = 0
     
-    init() {
+    init(plotPos : Int) {
         
-        playerScale = 5
+        self.playerScale = 5
+        self.plotPos = plotPos
         
         var walk = [SKTexture]()
         
@@ -57,11 +62,12 @@ class Player: SKSpriteNode {
         
         super.init(texture: walk[1], color: UIColor.clear, size: walk[1].size())
         
+        
         self.name = "Player"
         self.zPosition = 2
-        self.anchorPoint = CGPoint(x: 0.5, y: 0.4)
+        self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         self.setScale(playerScale)
-        self.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: self.size.width/2 - 20, height: 4*self.size.height/5))
+        self.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: self.size.width/2 - 20, height: self.size.height))
         self.physicsBody?.affectedByGravity = true
         self.physicsBody?.allowsRotation = false
         self.physicsBody?.categoryBitMask = ColliderType.Player
@@ -75,18 +81,15 @@ class Player: SKSpriteNode {
     
     func move(sprinting: Bool, right: Bool) {
         
-//        var speed : Int8
         rightDir = right
 
         if sprinting {
-//            speed = 13.5 // do sprintRatio * normal speed
             if movement != MovementType.sprint {
                 self.removeAction(forKey: "playerWalk")
                 self.run(SKAction.repeatForever(sprintAnimation), withKey: "playerSprint")
                 self.movement = MovementType.sprint
             }
         } else {
-//            speed = 9
             if movement != MovementType.walk {
                 self.removeAction(forKey: "playerSprint")
                 self.run(SKAction.repeatForever(walkAnimation), withKey: "playerWalk")
@@ -95,13 +98,11 @@ class Player: SKSpriteNode {
         }
 
         if !rightDir {
-//            speed *= -1
             self.xScale = self.playerScale * -1
         } else {
             self.xScale = self.playerScale
         }
 
-//        self.position.x += CGFloat(speed)
     }
     
     func stopMoving() {
@@ -114,8 +115,6 @@ class Player: SKSpriteNode {
         self.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
         self.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 240))
     }
-    
-    // MARK: Getters
     
     func getMovement() -> MovementType {
         return self.movement
